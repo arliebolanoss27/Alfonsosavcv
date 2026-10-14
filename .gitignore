@@ -13,6 +13,7 @@ dataset/
 dataset_procesado/
 dataset_intermedio/
 datos_propios/
+mis_fotos/
 runs/
 *.mp4
 *.mov

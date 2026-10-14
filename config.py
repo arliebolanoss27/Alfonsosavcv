@@ -77,3 +77,10 @@ SERIAL_TIMEOUT = 1.0
 # la clase "nada" no envía nada por serial.
 SOPORTA_APAGADO = False
 SERIAL_ESPERA_RESET = 2.0  # segundos que tarda el Nano en reiniciarse al abrir el puerto
+
+# Detección (varios objetos, una caja por objeto)
+MODELO_DET_PESOS = "best_det.pt"
+DET_IMGSZ = 640
+DET_CONF_MIN = 0.35   # por debajo de esto ni se dibuja la caja
+DET_CONF_ACTIVAR = 0.65  # confianza promedio mínima para que un objeto cuente como "estable"
+DET_VOTOS = 5         # en cuántos de los últimos ESTABILIDAD_FRAMES frames debe aparecer la clase

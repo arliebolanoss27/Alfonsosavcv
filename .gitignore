@@ -11,7 +11,7 @@ __pycache__/
 # Datasets procesados y temporales
 dataset/
 dataset_procesado/
-dataset_intermedio/
+# dataset_intermedio/ - ahora versionado
 datos_propios/
 mis_fotos/
 runs/

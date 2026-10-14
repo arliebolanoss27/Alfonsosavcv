@@ -27,6 +27,17 @@ def _cargar_modelo():
     return _modelo
 
 
+def predecir_probs(frame: np.ndarray) -> dict[str, float]:
+    """
+    Devuelve la probabilidad de las 10 clases para un frame BGR.
+    Se usa para promediar varios frames antes de decidir (estabilidad).
+    """
+    model = _cargar_modelo()
+    r = model.predict(source=frame, imgsz=config.MODELO_IMGSZ, verbose=False)[0]
+    valores = r.probs.data.cpu().numpy()
+    return {r.names[i]: float(valores[i]) for i in range(len(valores))}
+
+
 def predecir(frame: np.ndarray) -> tuple[str, float]:
     """
     Clasifica un frame BGR capturado con OpenCV.
@@ -38,18 +49,9 @@ def predecir(frame: np.ndarray) -> tuple[str, float]:
         (clase, confianza): nombre de la clase ganadora (str) y
         probabilidad normalizada (float en [0, 1]).
     """
-    model = _cargar_modelo()
-    results = model.predict(
-        source=frame,
-        imgsz=config.MODELO_IMGSZ,
-        verbose=False
-    )
-    r = results[0]
-    probs = r.probs
-    top1_idx = int(probs.top1)
-    confianza = float(probs.top1conf)
-    clase = r.names[top1_idx]
-    return clase, confianza
+    probs = predecir_probs(frame)
+    clase = max(probs, key=probs.get)
+    return clase, probs[clase]
 
 
 if __name__ == "__main__":

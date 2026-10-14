@@ -7,3 +7,6 @@ numpy>=1.26.0
 pandas>=2.2.0
 tqdm>=4.66.0
 pillow_heif>=1.8.0
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+pyttsx3>=2.90

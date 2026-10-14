@@ -1,0 +1,35 @@
+# Python / Virtual Environments
+.venv/
+env/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.ipynb_checkpoints
+
+# Datasets procesados y temporales
+dataset/
+dataset_procesado/
+datos_propios/
+runs/
+*.mp4
+*.mov
+*.avi
+
+# Pesos y modelos de IA
+*.pt
+*.pth
+*.onnx
+*.engine
+modelos/
+
+# IDEs y SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs y scratch
+*.log
+scratch/

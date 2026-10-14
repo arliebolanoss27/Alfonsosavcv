@@ -20,11 +20,12 @@ runs/
 *.avi
 
 # Pesos y modelos de IA
-*.pt
-*.pth
+# Se versiona solo modelos/best.pt (10 MB, dentro del límite de GitHub)
+# Se excluyen pesos de entrenamiento intermedios y archivos de ONNX/TensorRT
 *.onnx
 *.engine
-modelos/
+runs/**/weights/last.pt
+runs/**/weights/*.pt
 
 # IDEs y SO
 .vscode/

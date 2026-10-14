@@ -36,3 +36,15 @@ Thumbs.db
 # Logs y scratch
 *.log
 scratch/
+
+# Pesos auxiliares de FastSAM (se descargan solos)
+FastSAM-s.pt
+
+# Dataset de deteccion generado (solo se versionan las anotaciones propias)
+dataset_deteccion/electrocom/
+dataset_deteccion/listas/
+dataset_deteccion/data*.yaml
+dataset_deteccion/propios/estado.json
+yolo26s.pt
+yolo26*.pt
+weights/

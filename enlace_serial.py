@@ -48,6 +48,23 @@ class EnlaceSerial:
         self.ultimo_enviado = caracter
         return caracter
 
+    def apuntar(self, clase: str) -> bool:
+        """Apunta el láser a la caja de la clase. Mientras el protocolo no esté acordado solo lo imprime."""
+        n = config.MAPA_UBICACION.get(clase)
+        if n in (None, "x"):
+            return False
+        self._enviar_laser(config.LASER_COMANDO.format(n=n), f"láser -> caja {n} ({clase})")
+        return True
+
+    def apagar_laser(self):
+        self._enviar_laser(config.LASER_APAGAR, "láser apagado")
+
+    def _enviar_laser(self, comando: str, descripcion: str):
+        real = config.LASER_ACTIVO and self._ser is not None
+        if real:
+            self._ser.write(comando.encode("ascii"))
+        print(f"[serial] {'' if real else '(simulado) '}{descripcion}  {comando!r}")
+
     def cerrar(self):
         if self._ser is not None:
             self._ser.close()

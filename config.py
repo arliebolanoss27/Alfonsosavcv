@@ -84,3 +84,14 @@ DET_IMGSZ = 640
 DET_CONF_MIN = 0.35   # por debajo de esto ni se dibuja la caja
 DET_CONF_ACTIVAR = 0.65  # confianza promedio mínima para que un objeto cuente como "estable"
 DET_VOTOS = 5         # en cuántos de los últimos ESTABILIDAD_FRAMES frames debe aparecer la clase
+
+# Voz y láser
+MICROFONO_INDEX = None  # None = micrófono por defecto de Windows; ver sounddevice.query_devices()
+TECLA_VOZ = " "        # tecla para preguntar por voz (" " = espacio); cualquier carácter: "v", "m"...
+TECLA_PAUSA = "p"      # pausa/reanuda el envío al Nano
+VOZ_SEGUNDOS = 4.0      # cuánto se graba cada vez que se pulsa la tecla v
+# Protocolo del láser: PENDIENTE de acordar con electrónica. Mientras LASER_ACTIVO sea False,
+# solo se imprime lo que se enviaría; no se escribe nada en el puerto serial.
+LASER_ACTIVO = False
+LASER_COMANDO = "L{n}\n"   # apunta a la caja n (1 a 9)
+LASER_APAGAR = "L0\n"      # apaga el láser

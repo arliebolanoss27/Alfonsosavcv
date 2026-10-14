@@ -5,8 +5,11 @@ Uso:
     python main_det.py                    # cámara de config.CAMARA_INDEX, serial simulado si no hay Nano
     python main_det.py --camara 1 --puerto COM5
     python main_det.py --video prueba.mp4 # probar con un video en vez de cámara
+    python main_det.py --voz              # activa el asistente de voz (tecla v para preguntar)
 
-Teclas: q o Esc = salir | espacio = pausar/reanudar el envío al Nano | r = reiniciar estabilidad
+Teclas: q o Esc = salir | p = pausar/reanudar el envío al Nano | r = reiniciar estabilidad
+        espacio = preguntar por voz ("¿dónde está la resistencia?"); solo con --voz
+        (las teclas de voz y de pausa se cambian en config.py: TECLA_VOZ, TECLA_PAUSA)
 """
 
 import argparse
@@ -44,7 +47,7 @@ class EstabilidadPorClase:
         self._hist.clear()
 
 
-def dibujar(frame, detecciones, estables, enlace, fps, envio_activo):
+def dibujar(frame, detecciones, estables, enlace, fps, envio_activo, estado_voz=None):
     h, w = frame.shape[:2]
     esc = ALTO_VIDEO / h
     video = cv2.resize(frame, (int(w * esc), ALTO_VIDEO))
@@ -70,10 +73,12 @@ def dibujar(frame, detecciones, estables, enlace, fps, envio_activo):
     else:
         cv2.putText(panel, "Sin componente", (16, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, AMARILLO, 2)
 
+    if estado_voz:
+        cv2.putText(panel, estado_voz[:44], (16, ALTO_VIDEO - 110), cv2.FONT_HERSHEY_SIMPLEX, 0.45, AMARILLO, 1)
     y = ALTO_VIDEO - 80
     cv2.putText(panel, f"Serial: {enlace.estado}", (16, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, BLANCO, 1)
     cv2.putText(panel, f"Ultimo enviado: {enlace.ultimo_enviado or '-'}", (16, y + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.45, BLANCO, 1)
-    cv2.putText(panel, f"Envio: {'ACTIVO' if envio_activo else 'PAUSADO (espacio)'}", (16, y + 44),
+    cv2.putText(panel, f"Envio: {'ACTIVO' if envio_activo else f'PAUSADO ({config.TECLA_PAUSA})'}", (16, y + 44),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, VERDE if envio_activo else ROJO, 1)
     return np.hstack([video, panel])
 
@@ -84,6 +89,7 @@ def main():
     ap.add_argument("--video")
     ap.add_argument("--puerto")
     ap.add_argument("--sin-serial", action="store_true")
+    ap.add_argument("--voz", action="store_true", help="activa el asistente de voz (tecla v)")
     args = ap.parse_args()
 
     cap = abrir_fuente(args)
@@ -92,6 +98,11 @@ def main():
 
     enlace = EnlaceSerial(args.puerto, simulado=args.sin_serial)
     estabilidad = EstabilidadPorClase()
+    asistente = None
+    if args.voz:
+        from voz import Asistente
+        asistente = Asistente(enlace)
+        asistente.precargar()  # carga Whisper en segundo plano; la primera vez descarga el modelo
     envio_activo = True
     ultimo_t, fps = time.time(), 0.0
     try:
@@ -114,14 +125,17 @@ def main():
             ahora = time.time()
             fps = 0.9 * fps + 0.1 / max(ahora - ultimo_t, 1e-6)
             ultimo_t = ahora
-            cv2.imshow("ToolLighthouse (deteccion)", dibujar(frame, detecciones, estables, enlace, fps, envio_activo))
+            cv2.imshow("ToolLighthouse (deteccion)", dibujar(frame, detecciones, estables, enlace, fps, envio_activo,
+                                                                      asistente.estado if asistente else None))
             tecla = cv2.waitKey(1) & 0xFF
             if tecla in (ord("q"), 27):
                 break
-            if tecla == ord(" "):
+            if tecla == ord(config.TECLA_PAUSA):
                 envio_activo = not envio_activo
             if tecla == ord("r"):
                 estabilidad.reiniciar()
+            if tecla == ord(config.TECLA_VOZ) and asistente:
+                asistente.preguntar()
     finally:
         cap.release()
         enlace.cerrar()

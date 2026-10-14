@@ -11,6 +11,7 @@ __pycache__/
 # Datasets procesados y temporales
 dataset/
 dataset_procesado/
+dataset_intermedio/
 datos_propios/
 runs/
 *.mp4

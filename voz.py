@@ -18,6 +18,7 @@ Piezas:
 """
 
 import threading
+import time
 import unicodedata
 
 import numpy as np
@@ -199,8 +200,12 @@ def _reproducir_mp3(ruta):
             trozos.append(f.to_ndarray().reshape(-1))
     for f in conv.resample(None):
         trozos.append(f.to_ndarray().reshape(-1))
-    sd.play(np.concatenate(trozos).astype(np.float32) / 32768.0, tasa)
-    sd.wait()
+    datos = np.concatenate(trozos).astype(np.float32) / 32768.0
+    sd.play(datos, tasa)
+    limite = time.time() + len(datos) / tasa + 3  # nunca esperar más que la duración + 3 s
+    while sd.get_stream().active and time.time() < limite:
+        time.sleep(0.05)
+    sd.stop()
 
 
 def _voz_sapi_en_espanol(engine):

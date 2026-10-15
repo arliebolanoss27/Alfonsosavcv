@@ -31,8 +31,14 @@ def _cargar_modelo():
     return _modelo
 
 
-def detectar(frame: np.ndarray, conf: float = config.DET_CONF_MIN) -> list[Deteccion]:
-    r = _cargar_modelo().predict(source=frame, imgsz=config.DET_IMGSZ, conf=conf, verbose=False)[0]
+def precargar():
+    """Carga el modelo y hace una inferencia de calentamiento, para que el primer fotograma no se congele."""
+    _cargar_modelo().predict(source=np.zeros((config.DET_IMGSZ, config.DET_IMGSZ, 3), np.uint8),
+                             imgsz=config.DET_IMGSZ, verbose=False)
+
+
+def detectar(frame: np.ndarray, conf: float = config.DET_CONF_MIN, imgsz: int = config.DET_IMGSZ) -> list[Deteccion]:
+    r = _cargar_modelo().predict(source=frame, imgsz=imgsz, conf=conf, verbose=False)[0]
     salida = []
     for caja, c, k in zip(r.boxes.xyxy.cpu().numpy(), r.boxes.conf.cpu().numpy(), r.boxes.cls.cpu().numpy()):
         x0, y0, x1, y1 = (int(v) for v in caja)

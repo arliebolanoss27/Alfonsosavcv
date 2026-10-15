@@ -48,3 +48,4 @@ dataset_deteccion/propios/estado.json
 yolo26s.pt
 yolo26*.pt
 weights/
+cache_voz/

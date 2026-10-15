@@ -86,7 +86,9 @@ DET_CONF_ACTIVAR = 0.65  # confianza promedio mínima para que un objeto cuente 
 DET_VOTOS = 5         # en cuántos de los últimos ESTABILIDAD_FRAMES frames debe aparecer la clase
 
 # Voz y láser
-MICROFONO_INDEX = None  # None = micrófono por defecto de Windows; ver sounddevice.query_devices()
+MICROFONO_INDEX = None   # índice fijo del micrófono; None = buscarlo por nombre (abajo)
+MICROFONO_NOMBRE = "Microphone Array"  # el del laptop. El de Iriun (iPhone) llega en silencio
+VOZ_NEURAL = "es-MX-DaliaNeural"  # voz de respuesta; otras: es-MX-JorgeNeural, es-SV-LorenaNeural, es-SV-RodrigoNeural
 TECLA_VOZ = " "        # tecla para preguntar por voz (" " = espacio); cualquier carácter: "v", "m"...
 TECLA_PAUSA = "p"      # pausa/reanuda el envío al Nano
 VOZ_SEGUNDOS = 4.0      # cuánto se graba cada vez que se pulsa la tecla v

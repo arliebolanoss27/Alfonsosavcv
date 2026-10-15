@@ -7,7 +7,8 @@ responde por voz y apunta el láser a su caja.
 Todo corre local (sin internet):
     - voz a texto: faster-whisper (español)
     - entender qué pidió: tabla de sinónimos (no hace falta un LLM para 9 clases)
-    - respuesta hablada: voces de Windows (pyttsx3); conviene tener instalada una voz en español
+    - respuesta hablada: voz neuronal en español (edge-tts, con caché para que funcione sin internet);
+      si falla, voces de Windows (pyttsx3)
 
 Piezas:
     interpretar(texto)  -> clase o None
@@ -94,11 +95,29 @@ def _nombre_tecla() -> str:
 
 # ---------- voz a texto ----------
 
+def _buscar_microfono(nombre: str | None):
+    """Índice del primer micrófono (API MME, sin duplicados) cuyo nombre contiene `nombre`; None = el de Windows."""
+    if not nombre:
+        return None
+    import sounddevice as sd
+    for i, d in enumerate(sd.query_devices()):
+        if d["max_input_channels"] > 0 and d["hostapi"] == 0 and nombre.lower() in d["name"].lower():
+            return i
+    print(f"[voz] No encontré un micrófono que contenga '{nombre}'; uso el predeterminado de Windows.")
+    return None
+
+
 class Escucha:
     def __init__(self, modelo: str = "small", dispositivo: int | None = None):
         self._nombre_modelo = modelo
         self._modelo = None
-        self.dispositivo = dispositivo if dispositivo is not None else config.MICROFONO_INDEX
+        if dispositivo is not None:
+            self.dispositivo = dispositivo
+        elif config.MICROFONO_INDEX is not None:
+            self.dispositivo = config.MICROFONO_INDEX
+        else:
+            self.dispositivo = _buscar_microfono(config.MICROFONO_NOMBRE)
+        self.ultimo_pico = 0.0
 
     def _cargar(self):
         if self._modelo is None:
@@ -110,37 +129,102 @@ class Escucha:
         """Carga el modelo antes de usarlo (la primera vez descarga ~460 MB)."""
         self._cargar()
 
+    def nombre_microfono(self) -> str:
+        import sounddevice as sd
+        return sd.query_devices(self.dispositivo if self.dispositivo is not None else sd.default.device[0])["name"]
+
     def grabar(self, segundos: float = config.VOZ_SEGUNDOS) -> np.ndarray:
         import sounddevice as sd
         audio = sd.rec(int(segundos * FRECUENCIA), samplerate=FRECUENCIA, channels=1, dtype="float32",
                        device=self.dispositivo)
         sd.wait()
-        return audio[:, 0]
+        audio = audio[:, 0]
+        self.ultimo_pico = float(np.abs(audio).max())
+        if self.ultimo_pico > 0.01:
+            audio = audio * (0.9 / self.ultimo_pico)  # sube el volumen si el micrófono llega bajo
+        return audio
 
     def transcribir(self, audio: np.ndarray) -> str:
-        if audio.size == 0 or float(np.abs(audio).max()) < 0.01:
+        if audio.size == 0 or self.ultimo_pico < 0.01:
             return ""  # silencio: no dejar que Whisper invente texto
-        segmentos, _ = self._cargar().transcribe(audio, language="es", beam_size=1, vad_filter=True,
-                                                 initial_prompt=_PISTA, condition_on_previous_text=False)
+        segmentos, _ = self._cargar().transcribe(audio, language="es", beam_size=5, vad_filter=True,
+                                                 hotwords=_PISTA, condition_on_previous_text=False)
         return " ".join(s.text.strip() for s in segmentos).strip()
 
 
 # ---------- texto a voz ----------
 
-def _voz_en_espanol(engine):
+CACHE_VOZ = config.BASE_DIR / "cache_voz"
+
+
+def todas_las_respuestas() -> list[str]:
+    return [respuesta_para(c) for c in [*SINONIMOS, "apagar", None]]
+
+
+def _ruta_cache(texto: str):
+    import hashlib
+    return CACHE_VOZ / (hashlib.md5(f"{config.VOZ_NEURAL}|{texto}".encode()).hexdigest() + ".mp3")
+
+
+def _sintetizar_neural(texto: str):
+    """Genera el mp3 con la voz neuronal en español (necesita internet solo la primera vez por frase)."""
+    import asyncio
+    import edge_tts
+    ruta = _ruta_cache(texto)
+    if not ruta.exists():
+        CACHE_VOZ.mkdir(exist_ok=True)
+        asyncio.run(asyncio.wait_for(edge_tts.Communicate(texto, config.VOZ_NEURAL).save(str(ruta)), timeout=8))
+    return ruta
+
+
+def precalentar_voces() -> bool:
+    """Guarda en caché todas las respuestas posibles para que suenen también sin internet."""
+    try:
+        for t in todas_las_respuestas():
+            _sintetizar_neural(t)
+        return True
+    except Exception:
+        return False
+
+
+def _reproducir_mp3(ruta):
+    import av
+    import sounddevice as sd
+    cont = av.open(str(ruta))
+    tasa = cont.streams.audio[0].rate
+    conv = av.AudioResampler(format="s16", layout="mono", rate=tasa)  # siempre mono de 16 bits
+    trozos = []
+    for frame in cont.decode(audio=0):
+        for f in conv.resample(frame):
+            trozos.append(f.to_ndarray().reshape(-1))
+    for f in conv.resample(None):
+        trozos.append(f.to_ndarray().reshape(-1))
+    sd.play(np.concatenate(trozos).astype(np.float32) / 32768.0, tasa)
+    sd.wait()
+
+
+def _voz_sapi_en_espanol(engine):
     for v in engine.getProperty("voices"):
         idiomas = " ".join(str(i).lower() for i in getattr(v, "languages", []))
         nombre = v.name.lower()
-        if idiomas.startswith("es") or "spanish" in nombre or "espa" in nombre                 or any(n in nombre for n in ("sabina", "helena", "laura", "pablo", "raul", "zira")) and "english" not in nombre:
+        if idiomas.startswith("es") or "spanish" in nombre or "espa" in nombre:
             return v
     return None
 
 
 def hablar(texto: str):
-    """Dice el texto. Bloquea hasta terminar; llámalo desde un hilo si no quieres congelar la ventana."""
+    """
+    Dice el texto. Bloquea hasta terminar; llámalo desde un hilo si no quieres congelar la ventana.
+    Orden: voz neuronal en español (caché o internet) -> voz española de Windows -> voz por defecto.
+    """
+    try:
+        _reproducir_mp3(_sintetizar_neural(texto))
+        return
+    except Exception as e:
+        print(f"[voz] Voz neuronal no disponible ({type(e).__name__}); uso las voces de Windows.")
     import pyttsx3
     engine = pyttsx3.init()
-    voz = _voz_en_espanol(engine)
+    voz = _voz_sapi_en_espanol(engine)
     if voz is not None:
         engine.setProperty("voice", voz.id)
     else:
@@ -171,6 +255,8 @@ class Asistente:
         self.estado = "Voz: cargando modelo..."
         try:
             self.escucha.calentar()
+            self.estado = "Voz: preparando respuestas..."
+            precalentar_voces()
             self.estado = f"Voz: lista ({_nombre_tecla()})"
         except Exception as e:
             self.estado = f"Voz: error al cargar ({type(e).__name__})"

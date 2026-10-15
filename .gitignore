@@ -49,3 +49,7 @@ yolo26s.pt
 yolo26*.pt
 weights/
 cache_voz/
+
+# Datasets extra descargados (se bajan aparte, no se suben)
+datasets/extra/
+dataset_deteccion/extra/

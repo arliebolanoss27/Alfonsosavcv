@@ -28,7 +28,8 @@ def main():
     ap.add_argument("--epocas", type=int, default=60)
     ap.add_argument("--modelo", default="yolo26s.pt")
     ap.add_argument("--nombre", default="det_yolo26s")
-    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--imgsz", type=int, default=960, help="resolución de entrenamiento (960 ayuda con piezas pequeñas)")
     args = ap.parse_args()
 
     device = 0 if torch.cuda.is_available() else "cpu"
@@ -38,7 +39,7 @@ def main():
     model.train(
         data=str(DET / "data.yaml"),
         epochs=args.epocas,
-        imgsz=640,
+        imgsz=args.imgsz,
         batch=args.batch,
         device=device,
         workers=4,
@@ -61,8 +62,8 @@ def main():
     shutil.copy(mejor, config.MODELOS_DIR / "best_det.pt")
     print(f"Mejor peso copiado a {config.MODELOS_DIR / 'best_det.pt'}")
 
-    print("\n=== Validación SOLO con fotos propias (10 fotos) ===")
-    YOLO(str(mejor)).val(data=str(DET / "data_propios.yaml"), imgsz=640, device=device, plots=True,
+    print("\n=== Validación SOLO con fotos propias (27 fotos) ===")
+    YOLO(str(mejor)).val(data=str(DET / "data_propios.yaml"), imgsz=args.imgsz, device=device, plots=True,
                          project=str(config.BASE_DIR / "runs" / "detect"), name=args.nombre + "_propias", exist_ok=True)
 
 

@@ -41,7 +41,10 @@ EQUIVALENCIA = {
     "Capacitor-470mf": "capacitor_electrolitico",
 }
 FRACCION_FONDO = 0.10   # imágenes sin nuestras clases, respecto a las que sí las tienen
-REPETIR_PROPIAS = 10    # veces que se repiten las fotos propias en train (son pocas y valen más)
+REPETIR_PROPIAS = 3     # veces que se repiten las 38 fotos propias antiguas en train
+REPETIR_NUEVAS = 5      # veces que se repiten las 113 fotos nuevas (misma cámara y mesa que la demo)
+# Fotos nuevas que NO se usan para entrenar, para medir (índice de la foto por orden de hora)
+VAL_NUEVAS = {23, 24, 31, 32, 14, 15, 83, 84, 85, 57, 58, 59, 93, 94, 107, 108, 112}
 VAL_PROPIAS_POR_CLASE = {"diodo": 2, "jumper": 2, "potenciometro": 2, "servo": 2, "led": 1, "resistencia": 1}
 SEMILLA = 0
 
@@ -97,6 +100,15 @@ def separar_propias():
     return train, val
 
 
+def separar_nuevas():
+    train, val = [], []
+    for img in sorted((DET / "nuevas" / "images").glob("*.jpg")):
+        idx = int(img.stem.split("nueva")[-1])
+        (val if idx in VAL_NUEVAS else train).append(img)
+    print(f"nuevas: {len(train)} train, {len(val)} val")
+    return train, val
+
+
 def escribir_lista(ruta: Path, imgs):
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text("\n".join(str(p.resolve()) for p in imgs) + "\n")
@@ -110,10 +122,13 @@ def escribir_yaml(ruta: Path, train: str, val: str):
 def main():
     ec = convertir_electrocom()
     ptrain, pval = separar_propias()
+    ntrain, nval = separar_nuevas()
+    extra = sorted((DET / "extra" / "images").glob("*.jpg"))
+    print(f"extra (Kaggle): {len(extra)}")
     listas = DET / "listas"
-    escribir_lista(listas / "train.txt", ec["train"] + ptrain * REPETIR_PROPIAS)
-    escribir_lista(listas / "valid.txt", ec["valid"] + pval)
-    escribir_lista(listas / "valid_propios.txt", pval)
+    escribir_lista(listas / "train.txt", ec["train"] + ptrain * REPETIR_PROPIAS + ntrain * REPETIR_NUEVAS + extra)
+    escribir_lista(listas / "valid.txt", ec["valid"] + pval + nval)
+    escribir_lista(listas / "valid_propios.txt", pval + nval)
     escribir_yaml(DET / "data.yaml", "listas/train.txt", "listas/valid.txt")
     escribir_yaml(DET / "data_propios.yaml", "listas/train.txt", "listas/valid_propios.txt")
     print("Listo. Clases:", CLASES_DET)

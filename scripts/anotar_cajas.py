@@ -15,8 +15,11 @@ La clase la da la carpeta de la foto. Si una foto tiene objetos de otra clase (p
 en una foto de diodo), usa 's' para saltarla o dibuja solo la caja del objeto correcto.
 
 Uso:  python scripts/anotar_cajas.py
+      python scripts/anotar_cajas.py --origen dataset_captura --destino dataset_deteccion/capturas
+La carpeta "vacio" (mesa sola, manos) se acepta sola: son imágenes de fondo, sin cajas.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -69,12 +72,12 @@ def guardar(ruta: Path, clase: str, cajas, img_shape):
     (SALIDA / "labels").mkdir(parents=True, exist_ok=True)
     destino = SALIDA / "images" / f"{clase}_{ruta.name}"
     cv2.imwrite(str(destino), cargar(ruta), [cv2.IMWRITE_JPEG_QUALITY, 95])
-    cid = CLASES_DET.index(clase)
+    cid = CLASES_DET.index(clase) if clase in CLASES_DET else None
     lineas = []
     for x0, y0, x1, y1 in cajas:
         cx, cy, w, h = (x0 + x1) / 2 / W, (y0 + y1) / 2 / H, (x1 - x0) / W, (y1 - y0) / H
         lineas.append(f"{cid} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
-    (SALIDA / "labels" / f"{clase}_{ruta.stem}.txt").write_text("\n".join(lineas) + "\n")
+    (SALIDA / "labels" / f"{clase}_{ruta.stem}.txt").write_text("\n".join(lineas) + ("\n" if lineas else ""))
 
 
 def quitar(ruta: Path, clase: str):
@@ -83,6 +86,16 @@ def quitar(ruta: Path, clase: str):
 
 
 def main():
+    global ENTRADA, SALIDA, ESTADO
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--origen", help="carpeta con una subcarpeta por clase (por defecto dataset_intermedio/propios)")
+    ap.add_argument("--destino", help="dónde guardar (por defecto dataset_deteccion/propios)")
+    args = ap.parse_args()
+    if args.origen:
+        ENTRADA = config.BASE_DIR / args.origen
+    if args.destino:
+        SALIDA = config.BASE_DIR / args.destino
+        ESTADO = SALIDA / "estado.json"
     from ultralytics import FastSAM
 
     fotos = sorted(p for p in ENTRADA.glob("*/*") if p.suffix.lower() in (".jpg", ".jpeg", ".png"))
@@ -94,13 +107,18 @@ def main():
         ruta = fotos[i]
         clave = f"{ruta.parent.name}/{ruta.name}"
         clase = ruta.parent.name
-        if clase not in CLASES_DET:
+        if clase not in CLASES_DET and clase != "vacio":
             i += 1
             continue
         if clave in estado:
             i += 1
             continue
         img = cargar(ruta)
+        if clase == "vacio":  # fondo: imagen sin cajas, no hace falta revisarla una a una
+            guardar(ruta, clase, [], img.shape)
+            estado[clave] = "ok"
+            i += 1
+            continue
         H, W = img.shape[:2]
         esc = ANCHO_VENTANA / W
         caja = proponer_caja(modelo, img)
